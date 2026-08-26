@@ -1,0 +1,12 @@
+[pr_reviewer]
+num_code_suggestions = 4
+inline_code_comments = true
+extra_instructions = """
+This project (Dispatch) is a job-application agent. Pay special attention to:
+- the approval gate: any tool that sends email or applies to a job must require human approval, no bypass paths
+- the idempotency ledger: duplicate (company, role) applications must be blocked before send
+- no secrets, API keys, or personal resume data committed to the repo
+"""
+
+[pr_description]
+publish_labels = false

@@ -20,7 +20,15 @@ The send target is your own inbox (set via env var) — never a real employer.
 
 ## Running it
 
-_(filled in as pieces land)_
+```
+export OPENAI_API_KEY=sk-...
+./scripts/setup.sh
+```
+
+Boots TrueForge locally (SQLite, standalone mode) on `localhost:8790`,
+registers the OpenAI model provider, and attaches `deepwiki` as a smoke-test
+MCP tool (no auth required). Chat UI and API docs at
+`http://localhost:8790/api/v1/docs`.
 
 ## Qodo Code Review Evidence
 

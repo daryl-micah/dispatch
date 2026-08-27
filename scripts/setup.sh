@@ -21,11 +21,20 @@ if [ -z "${BRIGHTDATA_API_TOKEN:-}" ]; then
   exit 1
 fi
 
+# Only kills the PID if it's still our bridge process — a stale PID file
+# whose PID got reused by an unrelated process must not be killed blind.
+kill_bridge_pid() {
+  if [ -f /tmp/bridge.pid ]; then
+    pid="$(cat /tmp/bridge.pid)"
+    if ps -p "$pid" -o args= 2>/dev/null | grep -q "bridge/server.py"; then
+      kill "$pid" 2>/dev/null || true
+    fi
+  fi
+}
+
 echo "Starting Bright Data bridge on port 8791..."
-if [ -f /tmp/bridge.pid ]; then
-  kill "$(cat /tmp/bridge.pid)" 2>/dev/null || true
-  sleep 1
-fi
+kill_bridge_pid
+sleep 1
 python3 -m venv "${REPO_ROOT}/.venv" 2>/dev/null || true
 "${REPO_ROOT}/.venv/bin/pip" install --quiet -r "${REPO_ROOT}/bridge/requirements.txt"
 nohup "${REPO_ROOT}/.venv/bin/python3" "${REPO_ROOT}/bridge/server.py" > /tmp/bridge.log 2>&1 &
@@ -42,7 +51,7 @@ for i in $(seq 1 15); do
 done
 if [ -z "$bridge_ready" ]; then
   echo "Bright Data bridge didn't come up within 15s. See /tmp/bridge.log. Stopping it." >&2
-  kill "$(cat /tmp/bridge.pid)" 2>/dev/null || true
+  kill_bridge_pid
   exit 1
 fi
 
@@ -61,7 +70,7 @@ done
 if [ -z "$ready" ]; then
   echo "TrueForge didn't come up within 20s. See /tmp/trueforge.log. Stopping it." >&2
   kill "$(cat /tmp/trueforge.pid)" 2>/dev/null || true
-  kill "$(cat /tmp/bridge.pid)" 2>/dev/null || true
+  kill_bridge_pid
   exit 1
 fi
 

@@ -25,7 +25,8 @@ for i in $(seq 1 20); do
   sleep 1
 done
 if [ -z "$ready" ]; then
-  echo "TrueForge didn't come up within 20s. See /tmp/trueforge.log." >&2
+  echo "TrueForge didn't come up within 20s. See /tmp/trueforge.log. Stopping it." >&2
+  kill "$(cat /tmp/trueforge.pid)" 2>/dev/null || true
   exit 1
 fi
 
@@ -60,7 +61,11 @@ PYEOF
 echo "Registering deepwiki MCP server (no auth required)..."
 mcp_status=$(curl -s -o /tmp/mcp_register.log -w "%{http_code}" -X POST "${BASE_URL}/api/v1/settings/mcp-servers" \
   -H "Content-Type: application/json" \
-  -d '{"manifest": {"type": "remote", "name": "deepwiki", "url": "https://mcp.deepwiki.com/mcp", "description": "Read documentation and ask questions about any public GitHub repository."}}')
+  -d '{"manifest": {"type": "remote", "name": "deepwiki", "url": "https://mcp.deepwiki.com/mcp", "description": "Read documentation and ask questions about any public GitHub repository."}}') || {
+  echo "deepwiki MCP registration request failed (curl transport error). See /tmp/mcp_register.log." >&2
+  cat /tmp/mcp_register.log >&2
+  exit 1
+}
 if [ "$mcp_status" != "201" ] && [ "$mcp_status" != "409" ]; then
   echo "deepwiki MCP registration failed (HTTP $mcp_status):" >&2
   cat /tmp/mcp_register.log >&2

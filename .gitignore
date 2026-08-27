@@ -1,5 +1,7 @@
 node_modules/
+.venv/
 .env
+.env.*
 *.db
 *.sqlite
 dist/

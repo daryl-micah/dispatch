@@ -9,7 +9,7 @@ Harness Hackathon.
 
 ## What it does
 
-1. **Scrape** — Bright Data MCP pulls live LinkedIn listings for a query.
+1. **Scrape** — Bright Data pulls live LinkedIn listings for a query.
 2. **Score** — sandboxed script ranks roles against your resume, drops duplicates.
 3. **Tailor** — renders a cover letter per shortlisted role.
 4. **Approve** — full preview of the outbound email; approve, edit, or reject.
@@ -22,13 +22,20 @@ The send target is your own inbox (set via env var) — never a real employer.
 
 ```
 export OPENAI_API_KEY=sk-...
+export BRIGHTDATA_API_TOKEN=...
 ./scripts/setup.sh
 ```
 
 Boots TrueForge locally (SQLite, standalone mode) on `localhost:8790`,
-registers the OpenAI model provider, and attaches `deepwiki` as a smoke-test
-MCP tool (no auth required). Chat UI at `http://localhost:8790`, API docs at
-`http://localhost:8790/api/v1/docs`.
+registers the OpenAI model provider, and attaches two MCP servers:
+`deepwiki` (smoke test, no auth) and `bright-data` (job search — see
+[bridge/](bridge/) for why this runs through a local bridge process rather
+than a direct remote-MCP registration). Chat UI at `http://localhost:8790`,
+API docs at `http://localhost:8790/api/v1/docs`.
+
+Then create an agent with the `bright-data` tool attached and ask it to
+find jobs — see `scripts/setup.sh`'s output for the exact API calls, or use
+the chat UI directly.
 
 ## Qodo Code Review Evidence
 

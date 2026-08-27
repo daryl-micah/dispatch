@@ -10,8 +10,8 @@ Harness Hackathon.
 ## What it does
 
 1. **Scrape** — Bright Data pulls live LinkedIn listings for a query.
-2. **Score** — sandboxed script ranks roles against your resume, drops duplicates.
-3. **Tailor** — renders a cover letter per shortlisted role.
+2. **Score** — ranks roles against your resume by keyword overlap, drops duplicates.
+3. **Tailor** — the agent writes a cover letter per shortlisted role; rendered to PDF.
 4. **Approve** — full preview of the outbound email; approve, edit, or reject.
 5. **Dispatch** — sends, writes the ledger, appends the audit log. Never sends
    the same role twice.
@@ -27,15 +27,19 @@ export BRIGHTDATA_API_TOKEN=...
 ```
 
 Boots TrueForge locally (SQLite, standalone mode) on `localhost:8790`,
-registers the OpenAI model provider, and attaches two MCP servers:
-`deepwiki` (smoke test, no auth) and `bright-data` (job search — see
+registers the OpenAI model provider, and attaches three MCP servers:
+`deepwiki` (smoke test, no auth), `bright-data` (job search — see
 [bridge/](bridge/) for why this runs through a local bridge process rather
-than a direct remote-MCP registration). Chat UI at `http://localhost:8790`,
-API docs at `http://localhost:8790/api/v1/docs`.
+than a direct remote-MCP registration), and `scoring` (resume scoring +
+cover-letter rendering — see [scoring/NOTES.md](scoring/NOTES.md) for why
+this runs as a plain local service rather than inside TrueForge's sandbox).
+Chat UI at `http://localhost:8790`, API docs at
+`http://localhost:8790/api/v1/docs`.
 
-Then create an agent with the `bright-data` tool attached and ask it to
-find jobs — see `scripts/setup.sh`'s output for the exact API calls, or use
-the chat UI directly.
+Then create an agent with `bright-data` and `scoring` attached, send it
+your resume as a file attachment, and ask it to find and score jobs — see
+`scripts/setup.sh`'s output for the exact API calls, or use the chat UI
+directly. Generated cover letters land in `output/cover_letters/`.
 
 ## Qodo Code Review Evidence
 

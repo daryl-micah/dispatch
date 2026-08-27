@@ -5,24 +5,29 @@
 # Requires: OPENAI_API_KEY in the environment. Never prints the key.
 set -euo pipefail
 
-PORT="${PORT:-8790}"
-BASE_URL="http://localhost:${PORT}"
+BASE_URL="http://localhost:8790"
 
 if [ -z "${OPENAI_API_KEY:-}" ]; then
   echo "Set OPENAI_API_KEY before running this script." >&2
   exit 1
 fi
 
-echo "Starting TrueForge on port ${PORT}..."
-nohup npx -y @truefoundry/trueforge@latest --port "${PORT}" > /tmp/trueforge.log 2>&1 &
+echo "Starting TrueForge on port 8790..."
+nohup npx -y @truefoundry/trueforge@latest --port 8790 > /tmp/trueforge.log 2>&1 &
 echo $! > /tmp/trueforge.pid
 
+ready=""
 for i in $(seq 1 20); do
-  if curl -s -o /dev/null "${BASE_URL}/api/v1/docs"; then
+  if curl -s -f -o /dev/null "${BASE_URL}/api/v1/docs"; then
+    ready=1
     break
   fi
   sleep 1
 done
+if [ -z "$ready" ]; then
+  echo "TrueForge didn't come up within 20s. See /tmp/trueforge.log." >&2
+  exit 1
+fi
 
 echo "Registering OpenAI model provider..."
 python3 - <<PYEOF
@@ -47,19 +52,19 @@ req = urllib.request.Request(
     "${BASE_URL}/api/v1/settings/model-providers",
     data=json.dumps(payload).encode(),
     headers={"Content-Type": "application/json"},
-    method="POST",
+    method="PUT",
 )
-try:
-    urllib.request.urlopen(req)
-except urllib.error.HTTPError as e:
-    if e.code != 409:  # already registered
-        raise
+urllib.request.urlopen(req)  # PUT upserts: creates or replaces, always current
 PYEOF
 
 echo "Registering deepwiki MCP server (no auth required)..."
-curl -s -X POST "${BASE_URL}/api/v1/settings/mcp-servers" \
+mcp_status=$(curl -s -o /tmp/mcp_register.log -w "%{http_code}" -X POST "${BASE_URL}/api/v1/settings/mcp-servers" \
   -H "Content-Type: application/json" \
-  -d '{"manifest": {"type": "remote", "name": "deepwiki", "url": "https://mcp.deepwiki.com/mcp", "description": "Read documentation and ask questions about any public GitHub repository."}}' \
-  -o /dev/null -w "  -> %{http_code}\n" || true
+  -d '{"manifest": {"type": "remote", "name": "deepwiki", "url": "https://mcp.deepwiki.com/mcp", "description": "Read documentation and ask questions about any public GitHub repository."}}')
+if [ "$mcp_status" != "201" ] && [ "$mcp_status" != "409" ]; then
+  echo "deepwiki MCP registration failed (HTTP $mcp_status):" >&2
+  cat /tmp/mcp_register.log >&2
+  exit 1
+fi
 
-echo "TrueForge is up at ${BASE_URL} (docs at ${BASE_URL}/api/v1/docs)."
+echo "TrueForge is up. Chat UI: ${BASE_URL} · API docs: ${BASE_URL}/api/v1/docs"

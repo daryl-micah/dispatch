@@ -27,7 +27,7 @@ export OPENAI_API_KEY=sk-...
 
 Boots TrueForge locally (SQLite, standalone mode) on `localhost:8790`,
 registers the OpenAI model provider, and attaches `deepwiki` as a smoke-test
-MCP tool (no auth required). Chat UI and API docs at
+MCP tool (no auth required). Chat UI at `http://localhost:8790`, API docs at
 `http://localhost:8790/api/v1/docs`.
 
 ## Qodo Code Review Evidence
@@ -36,4 +36,4 @@ Every PR on this repo is reviewed via `/agentic_review` before merge.
 
 | PR | Review | Flagged | Fix |
 |----|--------|---------|-----|
-| _pending_ | | | |
+| [#1](https://github.com/daryl-micah/dispatch/pull/1) | [review](https://github.com/daryl-micah/dispatch/pull/1#pullrequestreview) | Readiness loop ignored HTTP failures; MCP registration errors silently swallowed (`\|\| true`); re-running with a new `OPENAI_API_KEY` left the stale key in place; unrequested `PORT` override; README pointed the chat UI at the API docs path | Readiness loop now fails closed with `curl -f` and a timeout exit; MCP registration checks the status code and exits nonzero on real failures; provider registration switched from POST+catch-409 to PUT (upsert), so reruns always pick up the current key; removed the `PORT` override; fixed the README URL |

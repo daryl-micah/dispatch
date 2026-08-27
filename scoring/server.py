@@ -14,7 +14,9 @@ Requires: nothing (no external API keys).
 """
 
 import base64
+import hashlib
 import io
+import json
 import re
 from pathlib import Path
 
@@ -101,10 +103,15 @@ def _sanitize_for_pdf(text: str) -> str:
 
 @server.tool()
 def render_cover_letter(letter_text: str, applicant_name: str, company: str, role: str) -> str:
-    """Render tailored cover letter text as a one-page PDF. Returns the saved file path."""
+    """Render tailored cover letter text as a PDF (intended to be one page — keep
+    letter_text short). Returns JSON: {"path": ..., "page_count": ..., "warning": ...}.
+    A page_count above 1 means the text overflowed; shorten it and re-render."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    safe = re.sub(r"[^a-zA-Z0-9]+", "_", f"{company}_{role}").strip("_").lower()
-    out_path = OUTPUT_DIR / f"{safe}.pdf"
+    # Alphanumeric-only normalization is lossy (e.g. "C++" and "C#" both become
+    # "c"), so a short content hash disambiguates what the readable name can't.
+    readable = re.sub(r"[^a-zA-Z0-9]+", "_", f"{company}_{role}").strip("_").lower() or "letter"
+    digest = hashlib.sha256(f"{company}::{role}".encode()).hexdigest()[:8]
+    out_path = OUTPUT_DIR / f"{readable}_{digest}.pdf"
 
     pdf = FPDF(format="letter")
     pdf.add_page()
@@ -117,7 +124,12 @@ def render_cover_letter(letter_text: str, applicant_name: str, company: str, rol
     pdf.multi_cell(0, 6, _sanitize_for_pdf(letter_text))
     pdf.output(str(out_path))
 
-    return str(out_path)
+    page_count = pdf.page_no()
+    return json.dumps({
+        "path": str(out_path),
+        "page_count": page_count,
+        "warning": None if page_count == 1 else f"Rendered as {page_count} pages, not 1 — shorten letter_text and re-render.",
+    })
 
 
 if __name__ == "__main__":

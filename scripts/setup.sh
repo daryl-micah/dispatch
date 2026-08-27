@@ -22,6 +22,10 @@ if [ -z "${BRIGHTDATA_API_TOKEN:-}" ]; then
 fi
 
 echo "Starting Bright Data bridge on port 8791..."
+if [ -f /tmp/bridge.pid ]; then
+  kill "$(cat /tmp/bridge.pid)" 2>/dev/null || true
+  sleep 1
+fi
 python3 -m venv "${REPO_ROOT}/.venv" 2>/dev/null || true
 "${REPO_ROOT}/.venv/bin/pip" install --quiet -r "${REPO_ROOT}/bridge/requirements.txt"
 nohup "${REPO_ROOT}/.venv/bin/python3" "${REPO_ROOT}/bridge/server.py" > /tmp/bridge.log 2>&1 &
@@ -37,7 +41,8 @@ for i in $(seq 1 15); do
   sleep 1
 done
 if [ -z "$bridge_ready" ]; then
-  echo "Bright Data bridge didn't come up within 15s. See /tmp/bridge.log." >&2
+  echo "Bright Data bridge didn't come up within 15s. See /tmp/bridge.log. Stopping it." >&2
+  kill "$(cat /tmp/bridge.pid)" 2>/dev/null || true
   exit 1
 fi
 

@@ -12,6 +12,7 @@ Requires: BRIGHTDATA_API_TOKEN in the environment.
 
 import json
 import os
+import urllib.parse
 
 import httpx
 from mcp.server.mcpserver import MCPServer
@@ -58,14 +59,30 @@ def _bd_call(tool_name: str, arguments: dict) -> dict:
             },
         )
         call.raise_for_status()
-        return _parse_sse_json(call.text)
+        return _parse_jsonrpc_response(call)
 
 
-def _parse_sse_json(body: str) -> dict:
-    for line in body.splitlines():
+def _parse_jsonrpc_response(response: httpx.Response) -> dict:
+    """Streamable HTTP servers may reply with application/json or SSE framing;
+    a client must accept either (MCP spec, streamable-http transport)."""
+    content_type = response.headers.get("content-type", "")
+    if "application/json" in content_type:
+        return response.json()
+    for line in response.text.splitlines():
         if line.startswith("data: "):
             return json.loads(line[len("data: "):])
-    raise ValueError(f"No SSE data line in response: {body!r}")
+    raise ValueError(f"No SSE data line in response: {response.text!r}")
+
+
+def _tool_result(response: dict) -> str:
+    """Raise on a JSON-RPC error or a tool-execution error (result.isError);
+    both represent a failed call and must not surface as tool output."""
+    if "error" in response:
+        raise RuntimeError(response["error"])
+    result = response["result"]
+    if result.get("isError"):
+        raise RuntimeError(result.get("content", result))
+    return json.dumps(result)
 
 
 @server.tool()
@@ -76,19 +93,18 @@ def search_jobs(query: str, location: str = "") -> str:
     scoped to linkedin.com/jobs postings.
     """
     scoped_query = f"site:linkedin.com/jobs {query} {location}".strip()
-    result = _bd_call("search_engine", {"query": scoped_query, "engine": "google"})
-    if "error" in result:
-        raise RuntimeError(result["error"])
-    return json.dumps(result["result"])
+    response = _bd_call("search_engine", {"query": scoped_query, "engine": "google"})
+    return _tool_result(response)
 
 
 @server.tool()
 def get_job_posting(url: str) -> str:
-    """Fetch the full text of a job posting page as markdown."""
-    result = _bd_call("scrape_as_markdown", {"url": url})
-    if "error" in result:
-        raise RuntimeError(result["error"])
-    return json.dumps(result["result"])
+    """Fetch the full text of a LinkedIn job posting page as markdown."""
+    host = urllib.parse.urlparse(url).hostname or ""
+    if not (host == "linkedin.com" or host.endswith(".linkedin.com")):
+        raise ValueError(f"get_job_posting only accepts linkedin.com URLs, got: {url!r}")
+    response = _bd_call("scrape_as_markdown", {"url": url})
+    return _tool_result(response)
 
 
 if __name__ == "__main__":
